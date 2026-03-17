@@ -53,9 +53,9 @@ def gen_sms(template, stock_name, contact_name=""):
     surname = contact_name[0] if len(contact_name) >= 2 else contact_name
 
     # Load environment variables for template formatting
-    contact_company = os.environ.get('CONTACT_COMPANY', '香港长富基金')
-    contact_name_env = os.environ.get('CONTACT_NAME', '常浩南')
-    contact_phone = os.environ.get('CONTACT_PHONE', '15011332355')
+    contact_company = os.environ.get('CONTACT_COMPANY', '示例基金')
+    contact_name_env = os.environ.get('CONTACT_NAME', '张三')
+    contact_phone = os.environ.get('CONTACT_PHONE', '138xxxx1234')
 
     return template.format(
         surname=surname,

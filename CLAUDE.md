@@ -5,7 +5,7 @@ A股减持公告自动监控+获客系统。每天自动抓取巨潮网减持公
 
 ## 环境
 - Python 3.14, venv虚拟环境
-- AI: 黑宇GPT-5.4 (OpenAI兼容接口)
+- AI: OpenAI兼容接口（支持GPT-4、Claude等）
 - 密钥在 .env 文件中，不要硬编码
 
 ## 每日运行命令
@@ -19,7 +19,7 @@ python3 jianchi/gen_daily_report.py
 - jianchi/contact_matcher.py - 联系方式匹配
 - jianchi/gen_daily_report.py - TXT简报生成器
 - jianchi/auto_outreach.py - 短信/邮件触达
-- jianchi/data/contacts_final.txt - 唯一联系方式库(32406条)
+- jianchi/data/contacts_final.txt - 联系方式库（用户自备）
 - daily_run.sh - 定时任务脚本
 - .env - 环境变量(API密钥等，不提交到git)
 
