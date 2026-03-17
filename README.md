@@ -379,10 +379,13 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 
 ## 致谢
 
+- [Anthropic](https://claude.com/product/claude-code) - vibe coding  
 - [巨潮资讯网](http://www.cninfo.com.cn) - 公告数据来源
 - [OpenAI](https://openai.com/) - GPT模型支持
 - [pdfplumber](https://github.com/jsvine/pdfplumber) - PDF解析库
 
----
+
+## 联系作者
+Richardclovesmom@163.com
 
 如果有帮助请给 ⭐️ Star
