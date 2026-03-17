@@ -1,0 +1,50 @@
+# 敏感数据
+jianchi/data/*.txt
+jianchi/data/*.xlsx
+jianchi/data/*.csv
+jianchi/data/*.json
+jianchi/data/*.pdf
+jianchi/data/pdfs/
+jianchi/daily_output/
+jianchi/jianchi.db
+jianchi/pdfs/
+main/
+others/
+*.xlsx
+*.json
+*.db
+*.PDF
+*.pdf
+*.tar.gz
+*.zip
+*.png
+
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# 环境
+.env
+.DS_Store
+.claude/
+
+# macOS临时文件
+.~*
+
+# 个人文件
+~*.xlsx
+~*.csv
+~*.json
+qxb_corp_all/
+qxb_verify_*.png
+wx_verify_batch.json
+fetch_share_float.py
+jianchi_unlock_v3.py
+jianchi_v2.tar.gz
+减持计划_2026汇总.xlsx
+企业股东_启信宝查询结果.xlsx
+今日减持公告_*.txt
+测试10个_验证结果.xlsx
+股东联系方式库.xlsx
