@@ -10,6 +10,15 @@ from collections import defaultdict
 
 BASE = os.path.expanduser("~/Desktop/减持获客系统")
 
+def to_float_ratio(val):
+    """将可能带%的比率字符串转为浮点数"""
+    if not val:
+        return 0
+    try:
+        return float(str(val).rstrip('%'))
+    except:
+        return 0
+
 def load_contacts_index():
     """加载合并联系方式库，按公司名建索引"""
     index = defaultdict(list)
@@ -83,7 +92,7 @@ def match_company(stock_name, contacts):
 def gen_ai_notes(rec):
     """生成AI备注"""
     notes = []
-    ratio = float(rec.get("减持比例(%)", 0))
+    ratio = to_float_ratio(rec.get("减持比例(%)", 0))
     holder = rec.get("股东名称", "")
     method = rec.get("减持方式", "")
     start = rec.get("起始日期", "")
@@ -174,7 +183,7 @@ def gen_report(date_str=None):
 
             # 确定优先级和标记
             priority = "🟡"
-            ratio_float = float(ratio) if ratio else 0
+            ratio_float = to_float_ratio(ratio)
             if ratio_float >= 3:
                 priority = "🔴"
             elif ratio_float >= 1:
@@ -226,7 +235,7 @@ def gen_report(date_str=None):
         f.write("\n" + "=" * 60 + "\n")
         f.write(f"  本次汇总:\n")
         f.write(f"    解析: {len(records)} 条 → 新增 0 + 更新 {len(unique)}\n")
-        f.write(f"    优先级: 🔴高 {len([r for r in unique if float(r.get('减持比例(%)', 0)) >= 3])} | 🟡中 {len([r for r in unique if 1 <= float(r.get('减持比例(%)', 0)) < 3])} | 🟢低 {len([r for r in unique if float(r.get('减持比例(%)', 0)) < 1])}\n")
+        f.write(f"    优先级: 🔴高 {len([r for r in unique if to_float_ratio(r.get('减持比例(%)', 0)) >= 3])} | 🟡中 {len([r for r in unique if 1 <= to_float_ratio(r.get('减持比例(%)', 0)) < 3])} | 🟢低 {len([r for r in unique if to_float_ratio(r.get('减持比例(%)', 0)) < 1])}\n")
         f.write(f"    匹配率: {len(unique)}/{len(records)} ({int(len(unique)/len(records)*100) if len(records) > 0 else 0}%)\n")
         f.write(f"    输出: {out_path}\n")
         f.write("=" * 60 + "\n")

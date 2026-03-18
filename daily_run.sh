@@ -1,10 +1,13 @@
 #!/bin/bash
-source ~/Desktop/减持获客系统/venv/bin/activate
-cd ~/Desktop/减持获客系统
+# 使用绝对路径，避免cron环境变量问题
+BASE_DIR="/Users/yaoyajing/Desktop/减持获客系统"
 
-# 从 .env 加载密钥
-if [ -f .env ]; then
-    export $(grep -v '^#' .env | xargs)
+source "$BASE_DIR/venv/bin/activate"
+cd "$BASE_DIR"
+
+# 从 .env 加载密钥（使用绝对路径）
+if [ -f "$BASE_DIR/.env" ]; then
+    export $(grep -v '^#' "$BASE_DIR/.env" | xargs)
 fi
 
 # 只在工作日运行
