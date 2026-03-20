@@ -36,12 +36,20 @@ def search_announcements(date_str: str) -> list[dict]:
             "seDate": f"{date_str}~{date_str}",
             "sortName": "", "sortType": "", "isHLtitle": "true",
         }
-        try:
-            r = requests.post(CNINFO_API_URL, headers=CNINFO_HEADERS,
-                              data=payload, timeout=15)
-            data = r.json()
-        except Exception as e:
-            print(f"  ✗ 请求失败 pg={page}: {e}")
+        data = None
+        for attempt in range(3):
+            try:
+                r = requests.post(CNINFO_API_URL, headers=CNINFO_HEADERS,
+                                  data=payload, timeout=15)
+                data = r.json()
+                break
+            except Exception as e:
+                print(f"  ✗ 请求失败 pg={page} (第{attempt+1}次): {e}")
+                if attempt < 2:
+                    time.sleep(3)
+
+        if data is None:
+            print(f"  ✗ pg={page} 重试3次均失败，跳过")
             break
 
         ann = data.get("announcements") or []
@@ -70,12 +78,20 @@ def search_date_range(start_date: str, end_date: str) -> list[dict]:
             "seDate": f"{start_date}~{end_date}",
             "sortName": "", "sortType": "", "isHLtitle": "true",
         }
-        try:
-            r = requests.post(CNINFO_API_URL, headers=CNINFO_HEADERS,
-                              data=payload, timeout=15)
-            data = r.json()
-        except Exception as e:
-            print(f"  ✗ 请求失败 pg={page}: {e}")
+        data = None
+        for attempt in range(3):
+            try:
+                r = requests.post(CNINFO_API_URL, headers=CNINFO_HEADERS,
+                                  data=payload, timeout=15)
+                data = r.json()
+                break
+            except Exception as e:
+                print(f"  ✗ 请求失败 pg={page} (第{attempt+1}次): {e}")
+                if attempt < 2:
+                    time.sleep(3)
+
+        if data is None:
+            print(f"  ✗ pg={page} 重试3次均失败，跳过")
             break
 
         ann = data.get("announcements") or []
