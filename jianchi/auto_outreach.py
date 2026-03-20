@@ -139,7 +139,9 @@ def batch_sms(date_str=None, template="cold", dry_run=True):
                 sent[item['phone']] = {"stock": item['stock'], "name": item['name'], "time": datetime.now().isoformat()}
             time.sleep(30)
     if not dry_run and sent:
-        with open(sent_file, "w", encoding="utf-8") as f: json.dump(sent, f, ensure_ascii=False, indent=2)
+        tmp_file = sent_file + ".tmp"
+        with open(tmp_file, "w", encoding="utf-8") as f: json.dump(sent, f, ensure_ascii=False, indent=2)
+        os.replace(tmp_file, sent_file)
     print(f"\n{'='*60}")
     if dry_run:
         print(f"  预览完成。确认后执行:")

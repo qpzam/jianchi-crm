@@ -103,26 +103,27 @@ def run_pipeline(
             text = ""
             print(f"    ⚠️ PDF下载失败")
 
-        # 解析
-        rec = parse_announcement(text, meta, mode=parse_mode, client_info=ai_client_info)
-        records.append(rec)
+        # 解析（返回列表，每个股东一条记录）
+        parsed_list = parse_announcement(text, meta, mode=parse_mode, client_info=ai_client_info)
+        records.extend(parsed_list)
 
         # 检查解析质量
-        holder = rec.get("股东名称", "")
-        ratio = rec.get("减持比例(%)", "")
-        warnings = rec.get("warnings", [])
+        for rec in parsed_list:
+            holder = rec.get("股东名称", "")
+            ratio = rec.get("减持比例(%)", "")
+            warnings = rec.get("warnings", [])
 
-        if holder:
-            print(f"    股东: {holder}  比例: {ratio}%")
-        else:
-            print(f"    ⚠️ 解析异常: 未提取到股东名称 [{code} {name}]")
+            if holder:
+                print(f"    股东: {holder}  比例: {ratio}%")
+            else:
+                print(f"    ⚠️ 解析异常: 未提取到股东名称 [{code} {name}]")
 
-        if warnings:
-            for w in warnings:
-                print(f"    ⚠️ {w}")
+            if warnings:
+                for w in warnings:
+                    print(f"    ⚠️ {w}")
 
-        if parse_mode in ("ai", "auto") and not holder and not ratio:
-            print(f"    ✗ AI解析失败: {code} {name}，返回空结果，请检查API连接或PDF内容")
+            if parse_mode in ("ai", "auto") and not holder and not ratio:
+                print(f"    ✗ AI解析失败: {code} {name}，返回空结果，请检查API连接或PDF内容")
 
     print(f"\n解析完成: {len(records)} 条记录")
 

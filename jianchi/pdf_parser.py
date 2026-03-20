@@ -257,39 +257,9 @@ def _call_ai(provider: str, client, prompt: str, model: str = None) -> str:
     raise ValueError(f"未知 provider: {provider}")
 
 
-def parse_ai(text: str, meta: dict = None, client_info=None) -> dict:
-    """
-    用 AI 语义解析公告
-
-    client_info: (provider, client, model) 元组，不传则自动创建
-    """
-    meta = meta or {}
-
-    if client_info is None:
-        client_info = _create_ai_client()
-
-    provider, client, model = client_info
-    if not provider:
-        print(f"  ✗ 无可用 AI 接口（设置 OPENAI_API_KEY 或 ANTHROPIC_API_KEY）")
-        return parse_regex(text, meta)
-
-    # 截取前4000字（控制token用量）
-    truncated = text[:4000] if len(text) > 4000 else text
-
-    try:
-        content = _call_ai(provider, client, _AI_PROMPT + truncated, model)
-
-        # 清理可能的markdown代码块
-        content = re.sub(r'^```json\s*', '', content)
-        content = re.sub(r'\s*```$', '', content)
-
-        parsed = json.loads(content)
-    except Exception as e:
-        print(f"  ✗ AI解析失败 ({provider}): {e}")
-        return parse_regex(text, meta)
-
-    # 组装为标准格式
-    rec = {
+def _build_record(parsed: dict, meta: dict) -> dict:
+    """将AI解析的单个股东对象组装为标准记录"""
+    return {
         "股票代码": meta.get("stock_code", ""),
         "股票名称": meta.get("stock_name", ""),
         "公告日期": meta.get("announcement_date", ""),
@@ -309,13 +279,56 @@ def parse_ai(text: str, meta: dict = None, client_info=None) -> dict:
         "warnings": [],
     }
 
-    return rec
+
+def parse_ai(text: str, meta: dict = None, client_info=None) -> list[dict]:
+    """
+    用 AI 语义解析公告，返回记录列表（每个股东一条）
+
+    client_info: (provider, client, model) 元组，不传则自动创建
+    """
+    meta = meta or {}
+
+    if client_info is None:
+        client_info = _create_ai_client()
+
+    provider, client, model = client_info
+    if not provider:
+        print(f"  ✗ 无可用 AI 接口（设置 OPENAI_API_KEY 或 ANTHROPIC_API_KEY）")
+        return [parse_regex(text, meta)]
+
+    # 截取前4000字（控制token用量）
+    truncated = text[:4000] if len(text) > 4000 else text
+
+    try:
+        content = _call_ai(provider, client, _AI_PROMPT + truncated, model)
+
+        # 清理可能的markdown代码块
+        content = re.sub(r'^```json\s*', '', content)
+        content = re.sub(r'\s*```$', '', content)
+
+        parsed = json.loads(content)
+    except Exception as e:
+        title = meta.get("announcement_title", "")
+        print(f"  [WARNING] AI解析失败，降级到regex模式 ({provider}): {e} | {title}")
+        return [parse_regex(text, meta)]
+
+    # AI现在返回数组，兼容旧格式（单个对象）
+    if isinstance(parsed, dict):
+        parsed = [parsed]
+
+    if not isinstance(parsed, list) or len(parsed) == 0:
+        return [parse_regex(text, meta)]
+
+    records = [_build_record(item, meta) for item in parsed]
+    if len(records) > 1:
+        print(f"    📋 公告含 {len(records)} 个股东，已拆分为独立记录")
+    return records
 
 
 def parse_announcement(text: str, meta: dict = None, mode: str = "regex",
-                       client_info=None) -> dict:
+                       client_info=None) -> list[dict]:
     """
-    统一入口：解析减持公告
+    统一入口：解析减持公告，返回记录列表（每个股东一条）
 
     mode:
       'regex' - 正则模式（默认，免费快速）
@@ -328,4 +341,4 @@ def parse_announcement(text: str, meta: dict = None, mode: str = "regex",
         # 全部走AI，提取更精准
         return parse_ai(text, meta, client_info)
     else:
-        return parse_regex(text, meta)
+        return [parse_regex(text, meta)]

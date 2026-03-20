@@ -308,10 +308,11 @@ def gen_ai_notes(rec):
             start_date = datetime.strptime(start, "%Y-%m-%d")
             today = datetime.now()
             days_until = (start_date - today).days
-            if 0 <= days_until <= 3:
-                notes.append("减持窗口临近")
+            if 0 <= days_until <= 5:
                 if days_until == 0:
-                    notes.append("今日开始")
+                    notes.append("减持窗口今日开始")
+                else:
+                    notes.append(f"减持窗口{days_until}天后开始")
         except:
             pass
 

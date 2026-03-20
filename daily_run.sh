@@ -20,7 +20,8 @@ if [ "$DOW" -gt 5 ]; then
 fi
 
 # 备份数据库
-cp jianchi/jianchi.db "jianchi/jianchi.db.bak.$(date +%Y%m%d)" 2>/dev/null || true
+mkdir -p jianchi/backups
+cp jianchi/jianchi.db "jianchi/backups/jianchi.db.$(date +%Y%m%d)" 2>/dev/null || true
 
 python3 -m jianchi --no-score --mode auto 2>&1 | tee jianchi/daily_output/log_$(date +%Y%m%d).txt
 
@@ -32,4 +33,9 @@ if [ ! -s "$PARSED_FILE" ]; then
 fi
 
 python3 jianchi/gen_daily_report.py $(date +%Y%m%d)
-osascript -e 'display notification "减持日报已生成" with title "减持获客系统" sound name "Glass"' 2>/dev/null || true
+
+if [ -f "jianchi/daily_output/今日减持_$(date +%Y%m%d).txt" ]; then
+    osascript -e 'display notification "减持日报已生成" with title "减持获客系统" sound name "Glass"' 2>/dev/null || true
+else
+    osascript -e 'display notification "减持日报生成失败！" with title "⚠️ 减持获客系统" sound name "Basso"' 2>/dev/null || true
+fi
