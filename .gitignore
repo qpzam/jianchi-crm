@@ -15,6 +15,7 @@ others/
 *.db
 *.PDF
 *.pdf
+!docs/法律法规/*.pdf
 *.tar.gz
 *.zip
 *.png

@@ -369,6 +369,14 @@ sudo pmset repeat wake MTWRFSU 08:00:00
 
 ---
 
+## 📖 Regulation Library
+
+Built-in A-share reduction regulation library with 101 files covering CSRC rules, SSE/SZSE guidelines.
+
+👉 [View full regulation index](docs/REGULATIONS.md)
+
+---
+
 ## FAQ
 
 <details>
