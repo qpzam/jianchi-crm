@@ -38,3 +38,11 @@ python3 jianchi/gen_daily_report.py
 - 当用户询问减持相关法律法规问题时，先在本地法规库中检索相关条文，再结合AI生成回答
 - AI模型：黑宇GPT-5.4（OPENAI_BASE_URL=从.env读取）
 - 法规问答命令：python3 jianchi/legal_advisor.py "你的问题"
+
+## 指令映射（收到以下指令时直接执行，不要修改任何代码）
+- "获取今天减持公告" / "抓取减持" / "今日减持" / "跑一下" = 执行以下命令：
+  source venv/bin/activate
+  python3 -m jianchi --no-score --mode auto
+  python3 jianchi/gen_daily_report.py
+  cat jianchi/daily_output/今日减持_$(date +%Y%m%d).txt
+  执行完汇报：抓取数量、解析数量、匹配率、高优先级列表。不要改代码。
