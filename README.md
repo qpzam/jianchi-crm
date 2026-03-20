@@ -362,5 +362,7 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 - [OpenAI](https://openai.com/) - GPT模型支持
 - [pdfplumber](https://github.com/jsvine/pdfplumber) - PDF解析库
 
+ ## 联系作者
+ richardclovesmom@163.com
 
 如果有帮助请给 ⭐️ Star
