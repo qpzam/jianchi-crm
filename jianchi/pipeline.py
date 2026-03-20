@@ -113,9 +113,22 @@ def run_pipeline(
             ratio = rec.get("减持比例(%)", "")
             warnings = rec.get("warnings", [])
 
+            # Bug2修复：股东名称为空时尝试从公告标题提取
+            if not holder:
+                title = meta.get("announcement_title", "")
+                import re as _re
+                # 尝试从标题提取股东类型描述
+                title_match = _re.search(r"(控股股东|实际控制人|持股5%以上股东|股东|董事|监事|高管)", title)
+                if title_match:
+                    rec["股东名称"] = title_match.group(1)
+                    holder = rec["股东名称"]
+                    print(f"    ⚠️ 股东名称为空，从标题提取: {holder}")
+                else:
+                    print(f"    ⚠️ 解析异常: 未提取到股东名称 [{code} {name}]")
+
             if holder:
                 print(f"    股东: {holder}  比例: {ratio}%")
-            else:
+            elif not holder:
                 print(f"    ⚠️ 解析异常: 未提取到股东名称 [{code} {name}]")
 
             if warnings:

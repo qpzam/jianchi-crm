@@ -8,6 +8,19 @@ import json, os, re, sys
 from datetime import datetime
 from collections import defaultdict
 
+try:
+    from jianchi.config_report import (
+        sort_key as config_sort_key, GROUP_HEADERS, LOCK_PRIORITY,
+        NO_LOCK_KEYWORDS, DISPUTED_KEYWORDS, LOCK_KEYWORDS,
+        DERIVED_KEYWORDS, DISPUTED_THRESHOLD,
+    )
+except ImportError:
+    from config_report import (
+        sort_key as config_sort_key, GROUP_HEADERS, LOCK_PRIORITY,
+        NO_LOCK_KEYWORDS, DISPUTED_KEYWORDS, LOCK_KEYWORDS,
+        DERIVED_KEYWORDS, DISPUTED_THRESHOLD,
+    )
+
 BASE = os.path.expanduser("~/Desktop/减持获客系统")
 
 def to_float_ratio(val):
@@ -105,40 +118,13 @@ def is_vc_fund(rec):
 
 
 # ── 受让方锁定判断 ──────────────────────────────────────
-
-# 确定不锁的关键词
-_NO_LOCK_KEYWORDS = [
-    "二级市场买入", "集中竞价买入", "竞价交易取得", "集中竞价交易取得",
-    "战略配售", "战略投资者配售",
-    "非公开发行", "定向增发", "定增",
-    "可交换债", "可交债换股", "可交换公司债券换股",
-    "向特定对象发行", "特定对象发行",
-]
-
-# 衍生方式关键词（不是独立来源，需看原始来源判断）
-_DERIVED_KEYWORDS = [
-    "资本公积转增", "资本公积金转增股本", "资本公积金转增",
-    "送股", "权益分派", "转增股份", "转增", "配股", "送转",
-]
-
-# 瑕疵不锁的关键词
-_FLAW_KEYWORDS = [
-    "以股抵债", "抵债",
-    "司法拍卖", "法拍", "司法划转",
-    "解散清算", "拆伙", "合伙企业清算",
-    "实物分配",
-    "协议划转", "协议转让", "协议受让",
-    "离婚", "财产分割",
-    "转融通",
-    "非交易过户",
-    "大宗交易增持", "大宗增持",
-]
-
-# 确定锁定的关键词
-_LOCK_KEYWORDS = [
-    "IPO前取得", "首发前", "首次公开发行前", "首次公开发行股票前",
-    "股权激励", "限制性股票",
-]
+# 关键词列表统一从 config_report.py 导入：
+#   NO_LOCK_KEYWORDS, DISPUTED_KEYWORDS, LOCK_KEYWORDS, DERIVED_KEYWORDS
+# 本地别名，方便 judge_lock_status 中使用
+_NO_LOCK_KEYWORDS = NO_LOCK_KEYWORDS + ["集中竞价交易取得", "向特定对象发行", "特定对象发行"]
+_DERIVED_KEYWORDS = DERIVED_KEYWORDS + ["资本公积金转增", "转增", "送转"]
+_FLAW_KEYWORDS = DISPUTED_KEYWORDS
+_LOCK_KEYWORDS = LOCK_KEYWORDS + ["首次公开发行股票前"]
 
 
 def judge_lock_status(rec):
@@ -241,7 +227,7 @@ def judge_lock_status(rec):
             title = rec.get("公告标题", "")
             holder_type = rec.get("股东类型", "")
             if hold_ratio > 0:
-                if hold_ratio >= 5:
+                if hold_ratio >= DISPUTED_THRESHOLD:
                     return ("🔴", "瑕疵锁定（≥5%，受让方锁6个月）",
                             f"{matched_flaw}取得，持股{hold_ratio}%≥5%")
                 else:
@@ -266,11 +252,29 @@ def judge_lock_status(rec):
     return ("❓", "锁定待确认", "股份来源信息不明确")
 
 
+def lock_group(rec):
+    """
+    返回锁定分组的状态key（对应 config_report.LOCK_PRIORITY）
+    使用 config_report 中定义的分组标题和优先级
+    """
+    if is_vc_fund(rec):
+        return "创投不锁"
+    emoji, _, _ = judge_lock_status(rec)
+    if emoji == "💚":
+        return "确定不锁"
+    elif emoji == "💛":
+        return "瑕疵不锁"
+    elif emoji == "🔴":
+        return "瑕疵锁定"
+    elif emoji == "🔒":
+        return "确定锁定"
+    else:
+        return "待确认"
+
+
 def lock_sort_order(rec):
     """返回锁定状态排序值（越小越优先）"""
-    emoji, _, _ = judge_lock_status(rec)
-    order = {"💚": 1, "💛": 2, "🔴": 3, "🔒": 4, "❓": 5}
-    return order.get(emoji, 5)
+    return LOCK_PRIORITY.get(lock_group(rec), 5)
 
 
 def gen_ai_notes(rec):
@@ -319,6 +323,10 @@ def gen_ai_notes(rec):
     return " + ".join(notes) if notes else "普通减持"
 
 def gen_report(date_str=None):
+    # 校验排序规则完整性
+    assert len(LOCK_PRIORITY) == 6, "锁定优先级必须有6个级别"
+    assert all(k in GROUP_HEADERS for k in LOCK_PRIORITY), "每个优先级必须有对应的分组标题"
+
     if not date_str:
         date_str = datetime.now().strftime("%Y%m%d")
 
@@ -341,115 +349,139 @@ def gen_report(date_str=None):
             seen[key] = rec
 
     unique = list(seen.values())
-    # 排序：🌟创投 > 💚不锁 > 💛瑕疵不锁 > 🔴🟡🟢按比例 > 🔒锁定 > ❓待确认
-    def sort_key(r):
-        vc = 0 if is_vc_fund(r) else 1
-        lock_order = lock_sort_order(r)
-        ratio_f = to_float_ratio(r.get("减持比例(%)", 0))
-        return (vc, lock_order, -ratio_f)
-    unique.sort(key=sort_key)
-    print(f"去重后 {len(unique)} 家")
 
-    # 加载联系方式
+    # 加载联系方式（排序需要用到）
     contacts = load_contacts_index()
     print(f"联系方式库: {len(contacts)} 家公司")
 
+    # 预计算每条记录的联系方式和锁定状态
+    rec_contacts = {}
+    for rec in unique:
+        name = rec.get("股票名称", "")
+        people = match_company(name, contacts)
+        rec_contacts[id(rec)] = people
+        # 计算锁定状态并存入记录（供 config_sort_key 使用）
+        rec["锁定状态"] = lock_group(rec)
+
+    # 三层排序（规则定义在 config_report.py）：
+    #   锁定状态 → 减持比例降序 → 有联系方式优先
+    unique.sort(key=lambda r: config_sort_key(
+        r, has_contact=len(rec_contacts.get(id(r), [])) > 0
+    ))
+    print(f"去重后 {len(unique)} 家")
+
     # 生成报告
     out_path = os.path.join(BASE, f"jianchi/daily_output/今日减持_{date_str}.txt")
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     matched_count = 0
     unmatched = []
 
+    # 按分组组织记录（使用 config_report 的分组标题）
+    from collections import OrderedDict
+    groups = OrderedDict()
+    for rec in unique:
+        gkey = rec["锁定状态"]  # 已在排序前计算
+        if gkey not in groups:
+            groups[gkey] = {"label": GROUP_HEADERS[gkey], "records": []}
+        groups[gkey]["records"].append(rec)
+
+    # 统计各分组数量
+    group_counts = {gkey: len(g["records"]) for gkey, g in groups.items()}
+
     with open(out_path, "w", encoding="utf-8") as f:
         f.write("=" * 60 + "\n")
-        f.write(f"  减持获客日报  {date_str[:4]}-{date_str[4:6]}-{date_str[6:]}\n")
-        f.write(f"  抓取: {len(records)} 条 | 新增: 0 | 匹配: {len(unique)}/{len(records)}\n")
+        f.write(f"  减持获客日报  {date_str}\n")
+        f.write(f"  抓取: {len(records)} 条 | 解析: {len(unique)} 家\n")
         f.write("=" * 60 + "\n")
 
-        for rec in unique:
-            code = rec.get("股票代码", "")
-            name = rec.get("股票名称", "")
-            holder = rec.get("股东名称", "")
-            ratio = rec.get("减持比例(%)", "")
-            method = rec.get("减持方式", "")
-            source = rec.get("股份来源", "")
-            start = rec.get("起始日期", "")
-            end = rec.get("截止日期", "")
+        seq = 0  # 全局序号
+        for gkey, gdata in groups.items():
+            glabel = gdata["label"]
+            recs = gdata["records"]
 
-            # 确定优先级和标记
-            vc = is_vc_fund(rec)
-            ratio_float = to_float_ratio(ratio)
-            if vc:
-                priority = "🌟"
-            elif ratio_float >= 3:
-                priority = "🔴"
-            elif ratio_float >= 1:
-                priority = "🟡"
-            else:
-                priority = "🟢"
+            # 分组标题（来自 config_report.GROUP_HEADERS）
+            f.write(f"\n{glabel}\n")
 
-            # 匹配联系方式
-            people = match_company(name, contacts)
-            has_contact = len(people) > 0
+            for rec in recs:
+                seq += 1
+                code = rec.get("股票代码", "")
+                name = rec.get("股票名称", "")
+                holder = rec.get("股东名称", "")
+                ratio = rec.get("减持比例(%)", "")
+                method = rec.get("减持方式", "")
+                source = rec.get("股份来源", "")
+                start = rec.get("起始日期", "")
+                end = rec.get("截止日期", "")
+                ratio_float = to_float_ratio(ratio)
 
-            f.write(f"\n{priority} [{unique.index(rec) + 1}] {code} {name} | {holder} | {ratio}\n")
-            f.write(f"    减持方式: {method} | 减持期间: {start} ~ {end}\n")
-            if source:
-                f.write(f"    股份来源: {source}\n")
-            if vc:
-                f.write(f"    🌟 创投基金减持 | 受让方不锁定 | 不受比例限制 | 可按市场价承接\n")
-            if has_contact:
-                f.write(f"    ✅ 有联系方式\n")
-            else:
-                f.write(f"    ❌ 无联系方式\n")
+                # 分组emoji作为行首标记
+                _emoji_map = {"创投不锁": "🌟", "确定不锁": "💚", "瑕疵不锁": "💛",
+                              "瑕疵锁定": "🔴", "确定锁定": "🔒", "待确认": "❓"}
+                group_emoji = _emoji_map.get(gkey, "❓")
+                f.write(f"\n{group_emoji} [{seq}] {code} {name} | {holder} | {ratio}%\n")
 
-            # 添加AI备注
-            ai_notes = gen_ai_notes(rec)
-            if ai_notes:
-                f.write(f"    🤖 AI备注: {ai_notes}\n")
-            # 锁定判断
-            lock_emoji, lock_label, lock_detail = judge_lock_status(rec)
-            f.write(f"    {lock_emoji} {lock_label}（{lock_detail}）\n")
-            # 有电话的排前面，去重
-            seen_p = set()
-            with_phone = []
-            without_phone = []
-            for p in people:
-                pk = (p["name"], p["phone"])
-                if pk in seen_p:
-                    continue
-                seen_p.add(pk)
-                if p["phone"]:
-                    with_phone.append(p)
+                # 减持比例合理性校验
+                if ratio_float > 5:
+                    f.write(f"    ⚠️ 比例异常({ratio}%)，可能是持股比例而非减持比例，需人工核实\n")
+                elif ratio_float > 3:
+                    f.write(f"    ⚠️ 高于常规上限({ratio}%)，请确认\n")
+
+                f.write(f"    减持方式: {method} | 减持期间: {start} ~ {end}\n")
+                if source:
+                    f.write(f"    股份来源: {source}\n")
+                if is_vc_fund(rec):
+                    f.write(f"    🌟 创投基金减持 | 受让方不锁定 | 不受比例限制 | 可按市场价承接\n")
+
+                # 联系方式
+                people = rec_contacts.get(id(rec), [])
+                has_contact = len(people) > 0
+
+                if has_contact:
+                    f.write(f"    ✅ 有联系方式\n")
                 else:
-                    without_phone.append(p)
+                    f.write(f"    ❌ 无联系方式\n")
 
-            all_people = with_phone + without_phone
-            if with_phone:
-                matched_count += 1
-                f.write(f"    联系方式 ({len(with_phone)} 条):\n")
-                for p in with_phone:
-                    f.write(f"      - {p['name']} | {p['phone']} | {p['title']}\n")
-            else:
-                unmatched.append(f"{code} {name}")
+                # AI备注
+                ai_notes = gen_ai_notes(rec)
+                if ai_notes:
+                    f.write(f"    🤖 AI备注: {ai_notes}\n")
+
+                # 锁定判断详情（非创投时显示）
+                if not is_vc_fund(rec):
+                    lock_emoji, lock_label, lock_detail = judge_lock_status(rec)
+                    f.write(f"    {lock_emoji} {lock_label}（{lock_detail}）\n")
+
+                # 联系方式列表
+                seen_p = set()
+                with_phone = []
+                for p in people:
+                    pk = (p["name"], p["phone"])
+                    if pk in seen_p:
+                        continue
+                    seen_p.add(pk)
+                    if p["phone"]:
+                        with_phone.append(p)
+
+                if with_phone:
+                    matched_count += 1
+                    f.write(f"    联系方式 ({len(with_phone)} 条):\n")
+                    for p in with_phone:
+                        f.write(f"      - {p['name']} | {p['phone']} | {p['title']}\n")
+                else:
+                    unmatched.append(f"{code} {name}")
 
         # 统计
         f.write("\n" + "=" * 60 + "\n")
-        f.write(f"  本次汇总:\n")
-        f.write(f"    解析: {len(records)} 条 → 新增 0 + 更新 {len(unique)}\n")
-        vc_count = len([r for r in unique if is_vc_fund(r)])
-        f.write(f"    优先级: 🌟创投 {vc_count} | 🔴高 {len([r for r in unique if not is_vc_fund(r) and to_float_ratio(r.get('减持比例(%)', 0)) >= 3])} | 🟡中 {len([r for r in unique if not is_vc_fund(r) and 1 <= to_float_ratio(r.get('减持比例(%)', 0)) < 3])} | 🟢低 {len([r for r in unique if not is_vc_fund(r) and to_float_ratio(r.get('减持比例(%)', 0)) < 1])}\n")
-        if vc_count > 0:
-            f.write(f"    创投基金减持: {vc_count} 家（受让方不锁定）\n")
-        # 锁定判断统计
-        lock_stats = {"💚": 0, "💛": 0, "🔴": 0, "🔒": 0, "❓": 0}
-        for r in unique:
-            le, _, _ = judge_lock_status(r)
-            lock_stats[le] = lock_stats.get(le, 0) + 1
-        f.write(f"    锁定判断: 💚 不锁定: {lock_stats['💚']} 家 | 💛 瑕疵不锁: {lock_stats['💛']} 家 | 🔒 锁定: {lock_stats['🔒']} 家 | ❓ 待确认: {lock_stats['❓']} 家\n")
-        f.write(f"    匹配率: {len(unique)}/{len(records)} ({int(len(unique)/len(records)*100) if len(records) > 0 else 0}%)\n")
-        f.write(f"    输出: {out_path}\n")
+        f.write(f"  统计:\n")
+        f.write(f"    总计: {len(unique)} 家\n")
+
+        vc_n = group_counts.get("创投不锁", 0)
+        nl_n = group_counts.get("确定不锁", 0)
+        fl_n = group_counts.get("瑕疵不锁", 0) + group_counts.get("瑕疵锁定", 0)
+        lk_n = group_counts.get("确定锁定", 0)
+        uk_n = group_counts.get("待确认", 0)
+        f.write(f"    🌟 创投: {vc_n} 家 | 💚 不锁: {nl_n} 家 | 💛 瑕疵: {fl_n} 家 | 🔒 锁定: {lk_n} 家 | ❓ 待确认: {uk_n} 家\n")
+        f.write(f"    有联系方式: {matched_count} 家 | 无联系方式: {len(unmatched)} 家\n")
         f.write("=" * 60 + "\n")
 
         if unmatched:

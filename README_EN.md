@@ -15,6 +15,12 @@ JianChi CRM Pro is an intelligent client acquisition system designed for block t
 
 ## 📢 Recent Updates
 
+### v2.4.0 (2026-03-20)
+- 📐 New `config_report.py` — central config file for report sorting and lock-up rules, decoupled from code
+- 🔀 6-tier report grouping: VC no-lock → Definite no-lock → Disputed no-lock → Disputed locked → Definite locked → Pending
+- 🔒 Startup integrity check ensures all 6 priority levels have matching group headers
+- 📋 Lock-up keywords managed centrally in config to prevent hardcoded drift
+
 ### v2.3.0 (2026-03-20)
 - 🕐 daily_run.sh forces Asia/Shanghai timezone — more reliable date handling under cron
 - 🔒 .env file permissions tightened to 600 to prevent credential leakage
