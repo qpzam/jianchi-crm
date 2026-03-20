@@ -1,3 +1,5 @@
+[English](README_EN.md)
+
 # 减持获客智能系统 JianChi CRM Pro
 
 [![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://www.python.org/)
