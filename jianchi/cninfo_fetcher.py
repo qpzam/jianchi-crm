@@ -55,6 +55,9 @@ def search_announcements(date_str: str) -> list[dict]:
         ann = data.get("announcements") or []
         if not ann:
             break
+        # 结构校验：检查返回数据是否包含预期字段
+        if ann and "announcementId" not in ann[0]:
+            print(f"  ⚠️ [WARNING] 巨潮网API结构可能已变更，缺少announcementId字段")
         items.extend(ann)
         print(f"  pg={page} 获取 {len(ann)} 条")
 
@@ -143,6 +146,9 @@ def download_pdf(item: dict, output_dir: str = None) -> str | None:
     os.makedirs(output_dir, exist_ok=True)
 
     url = CNINFO_PDF_BASE + adj_url
+    if "cninfo.com.cn" not in url:
+        print(f"  ⚠️ URL域名异常，跳过下载: {url}")
+        return None
     filename = adj_url.split("/")[-1]
     filepath = os.path.join(output_dir, filename)
 
@@ -214,27 +220,29 @@ def extract_meta(item: dict) -> dict:
 def fetch_and_filter(date_str: str) -> list[dict]:
     """
     一站式：搜索 + 过滤 + 提取元数据
-    搜索当天 + 前一天（覆盖晚间发布的公告）
+    搜索当天 + 前2天（覆盖晚间/周末发布的公告），按announcementId去重
     返回过滤后的公告元数据列表
     """
     from datetime import datetime, timedelta
     dt = datetime.strptime(date_str, "%Y-%m-%d")
-    prev_str = (dt - timedelta(days=1)).strftime("%Y-%m-%d")
+    prev1_str = (dt - timedelta(days=1)).strftime("%Y-%m-%d")
+    prev2_str = (dt - timedelta(days=2)).strftime("%Y-%m-%d")
 
-    print(f"🔍 搜索 {prev_str} ~ {date_str} 的减持公告...")
+    print(f"🔍 搜索 {prev2_str} ~ {date_str} 的减持公告...")
     raw_today = search_announcements(date_str)
-    raw_prev = search_announcements(prev_str)
+    raw_prev1 = search_announcements(prev1_str)
+    raw_prev2 = search_announcements(prev2_str)
 
-    # 合并去重
+    # 合并去重（按announcementId）
     seen = set()
     combined = []
-    for r in raw_today + raw_prev:
+    for r in raw_today + raw_prev1 + raw_prev2:
         aid = r.get("announcementId", "")
-        if aid not in seen:
+        if aid and aid not in seen:
             seen.add(aid)
             combined.append(r)
 
-    print(f"  原始结果: {len(raw_today)}+{len(raw_prev)}={len(combined)} 条（去重后）")
+    print(f"  原始结果: {len(raw_today)}+{len(raw_prev1)}+{len(raw_prev2)}={len(combined)} 条（去重后）")
 
     filtered = filter_announcements(combined)
     print(f"  过滤后: {len(filtered)} 条（预披露/计划类）")

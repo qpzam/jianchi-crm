@@ -3,12 +3,14 @@ set -e
 
 # 使用绝对路径，避免cron环境变量问题
 BASE_DIR="/Users/yaoyajing/Desktop/减持获客系统"
+export TZ=Asia/Shanghai
 
 source "$BASE_DIR/venv/bin/activate"
 cd "$BASE_DIR"
 
 # 从 .env 加载密钥（使用绝对路径）
 if [ -f "$BASE_DIR/.env" ]; then
+    chmod 600 "$BASE_DIR/.env" 2>/dev/null
     export $(grep -v '^#' "$BASE_DIR/.env" | xargs)
 fi
 

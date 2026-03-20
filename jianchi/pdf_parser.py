@@ -280,6 +280,31 @@ def _build_record(parsed: dict, meta: dict) -> dict:
     }
 
 
+_AI_DAILY_LIMIT = 100
+
+
+def _check_ai_call_limit() -> bool:
+    """检查今日AI调用次数，超过限制返回False"""
+    today = datetime.now().strftime("%Y%m%d")
+    count_file = os.path.join(os.path.dirname(__file__), "daily_output", f"ai_call_count_{today}.txt")
+    count = 0
+    if os.path.exists(count_file):
+        try:
+            with open(count_file, "r") as f:
+                count = int(f.read().strip())
+        except (ValueError, OSError):
+            count = 0
+    if count >= _AI_DAILY_LIMIT:
+        return False
+    count += 1
+    try:
+        with open(count_file, "w") as f:
+            f.write(str(count))
+    except OSError:
+        pass
+    return True
+
+
 def parse_ai(text: str, meta: dict = None, client_info=None) -> list[dict]:
     """
     用 AI 语义解析公告，返回记录列表（每个股东一条）
@@ -287,6 +312,11 @@ def parse_ai(text: str, meta: dict = None, client_info=None) -> list[dict]:
     client_info: (provider, client, model) 元组，不传则自动创建
     """
     meta = meta or {}
+
+    # 每日调用次数限制
+    if not _check_ai_call_limit():
+        print(f"  ⚠️ [WARNING] 今日AI调用已达{_AI_DAILY_LIMIT}次上限，自动停止，降级到regex模式")
+        return [parse_regex(text, meta)]
 
     if client_info is None:
         client_info = _create_ai_client()
