@@ -17,6 +17,9 @@ if [ "$DOW" -gt 5 ]; then
     exit 0
 fi
 
+# 备份数据库
+cp jianchi/jianchi.db "jianchi/jianchi.db.bak.$(date +%Y%m%d)" 2>/dev/null || true
+
 python3 -m jianchi --no-score --mode auto 2>&1 | tee jianchi/daily_output/log_$(date +%Y%m%d).txt
 python3 jianchi/gen_daily_report.py $(date +%Y%m%d)
 osascript -e 'display notification "减持日报已生成" with title "减持获客系统" sound name "Glass"' 2>/dev/null || true
