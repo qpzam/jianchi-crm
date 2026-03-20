@@ -24,6 +24,9 @@ JianChi CRM Pro is an intelligent client acquisition system designed for block t
 - 📡 Scraping window expanded to cover prior 2 days + today to catch late-night/weekend announcements
 - 📜 Extended disclaimer
 
+<details>
+<summary>View previous updates</summary>
+
 ### v2.2.0 (2026-03-20)
 - 📋 Multi-shareholder announcements auto-split into individual records, each retaining its own reduction ratio
 - ⏰ Reduction window proximity alert extended to 5 days, with exact countdown in notes
@@ -51,6 +54,8 @@ JianChi CRM Pro is an intelligent client acquisition system designed for block t
 - 📄 PDF parsing for reduction information extraction
 - 📊 Daily report auto-generation
 
+</details>
+
 ## One-Liner
 
 Every day at 8 AM, automatically scrape A-share reduction announcements → AI-parse PDFs → generate smart reports with lock-up assessment, 2 hours ahead of peers.
@@ -76,6 +81,59 @@ Every day at 8 AM, automatically scrape A-share reduction announcements → AI-p
 | ⏰ **Scheduled Execution** | Crontab support with macOS lid-close wake capability |
 | 🔍 **CRM Management** | Lead status tracking, follow-up history, conversion funnel analysis |
 
+
+---
+
+## Daily Report Example
+
+```
+============================================================
+  Shareholder Reduction Daily Report  2026-03-20
+  Scraped: 18 | New: 0
+============================================================
+
+🌟 [1] 300567 某芯片公司 (a chip company) | 深圳创新投资合伙企业 (Shenzhen Innovation Investment LP) | 2.80%
+    Reduction Method: Block Trade | Reduction Period: 2026-03-25 ~ 2026-09-24
+    Share Origin: Acquired pre-IPO
+    🌟 VC Fund Reduction | Transferee No-Lock | No ratio restriction | Can be acquired at market price
+    🤖 AI Notes: 🌟 VC fund reduction, no transferee lock-up, no ratio limit — prioritize follow-up
+    💚 Transferee No-Lock (VC fund reduction)
+
+🔴 [2] 600123 某科技公司 (a tech company) | 创新合伙人 (Innovation Partners) | 3.50%
+    Reduction Method: Block Trade | Reduction Period: 2026-03-20 ~ 2026-09-19
+    Share Origin: Acquired pre-IPO
+    🤖 AI Notes: High-ratio reduction + likely block trade + institutional shareholder + potential acquisition demand
+    🔒 Transferee Locked 6 months (acquired pre-IPO)
+
+🟡 [3] 002456 某制造公司 (a manufacturing company) | 南方资本 (Southern Capital) | 1.80%
+    Reduction Method: Centralized Bidding | Reduction Period: 2026-03-25 ~ 2026-09-24
+    Share Origin: Secondary market purchase
+    🤖 AI Notes: Institutional shareholder + potential acquisition demand
+    💚 Transferee No-Lock (secondary market purchase)
+
+🟢 [4] 300789 某电气公司 (an electrical company) | 苏州高新区 (Suzhou Hi-Tech Zone) | 0.50%
+    Reduction Method: Block Trade | Reduction Period: 2026-04-01 ~ 2026-09-30
+    Share Origin: Agreement transfer
+    🤖 AI Notes: Routine reduction
+    💛 Disputed No-Lock (holding ratio unknown — needs confirmation) (acquired via agreement transfer, holding ratio unknown)
+
+============================================================
+  Summary:
+    Parsed: 18 → New 0 + Updated 15
+    Priority: 🌟VC 1 | 🔴High 3 | 🟡Medium 5 | 🟢Low 6
+    VC Fund Reductions: 1 (transferee no-lock)
+    Lock-up Assessment: 💚 No-Lock: 5 | 💛 Disputed No-Lock: 3 | 🔒 Locked: 2 | ❓ Pending: 5
+    Output: jianchi/daily_output/今日减持_20260320.txt
+============================================================
+```
+
+---
+
+## 📖 Regulation Library
+
+Built-in A-share reduction regulation library with 101 files covering CSRC rules, SSE/SZSE guidelines.
+
+👉 [View full regulation index](docs/REGULATIONS.md)
 
 ---
 
@@ -141,51 +199,6 @@ sudo pmset -b disablesleep 1  # Allow sleep but scheduled tasks will wake the sy
 ```
 
 **⚠️ Note: Choose "sleep on lid close but don't shut down" — scheduled tasks will still auto-wake and run.**
-
----
-
-## Daily Report Example
-
-```
-============================================================
-  Shareholder Reduction Daily Report  2026-03-20
-  Scraped: 18 | New: 0
-============================================================
-
-🌟 [1] 300567 某芯片公司 (a chip company) | 深圳创新投资合伙企业 (Shenzhen Innovation Investment LP) | 2.80%
-    Reduction Method: Block Trade | Reduction Period: 2026-03-25 ~ 2026-09-24
-    Share Origin: Acquired pre-IPO
-    🌟 VC Fund Reduction | Transferee No-Lock | No ratio restriction | Can be acquired at market price
-    🤖 AI Notes: 🌟 VC fund reduction, no transferee lock-up, no ratio limit — prioritize follow-up
-    💚 Transferee No-Lock (VC fund reduction)
-
-🔴 [2] 600123 某科技公司 (a tech company) | 创新合伙人 (Innovation Partners) | 3.50%
-    Reduction Method: Block Trade | Reduction Period: 2026-03-20 ~ 2026-09-19
-    Share Origin: Acquired pre-IPO
-    🤖 AI Notes: High-ratio reduction + likely block trade + institutional shareholder + potential acquisition demand
-    🔒 Transferee Locked 6 months (acquired pre-IPO)
-
-🟡 [3] 002456 某制造公司 (a manufacturing company) | 南方资本 (Southern Capital) | 1.80%
-    Reduction Method: Centralized Bidding | Reduction Period: 2026-03-25 ~ 2026-09-24
-    Share Origin: Secondary market purchase
-    🤖 AI Notes: Institutional shareholder + potential acquisition demand
-    💚 Transferee No-Lock (secondary market purchase)
-
-🟢 [4] 300789 某电气公司 (an electrical company) | 苏州高新区 (Suzhou Hi-Tech Zone) | 0.50%
-    Reduction Method: Block Trade | Reduction Period: 2026-04-01 ~ 2026-09-30
-    Share Origin: Agreement transfer
-    🤖 AI Notes: Routine reduction
-    💛 Disputed No-Lock (holding ratio unknown — needs confirmation) (acquired via agreement transfer, holding ratio unknown)
-
-============================================================
-  Summary:
-    Parsed: 18 → New 0 + Updated 15
-    Priority: 🌟VC 1 | 🔴High 3 | 🟡Medium 5 | 🟢Low 6
-    VC Fund Reductions: 1 (transferee no-lock)
-    Lock-up Assessment: 💚 No-Lock: 5 | 💛 Disputed No-Lock: 3 | 🔒 Locked: 2 | ❓ Pending: 5
-    Output: jianchi/daily_output/今日减持_20260320.txt
-============================================================
-```
 
 ---
 
@@ -279,14 +292,6 @@ sudo pmset repeat wake MTWRFSU 08:00:00
 ```
 
 **⚠️ Important: Use "sleep on lid close, don't shut down" mode — the system will auto-wake when a scheduled task fires.**
-
----
-
-## 📖 Regulation Library
-
-Built-in A-share reduction regulation library with 101 files covering CSRC rules, SSE/SZSE guidelines.
-
-👉 [View full regulation index](docs/REGULATIONS.md)
 
 ---
 
