@@ -61,3 +61,8 @@ python3 jianchi/gen_daily_report.py
   * 排序逻辑：锁定状态(创投不锁>确定不锁>瑕疵不锁>瑕疵锁定>确定锁定>待确认) → 减持比例降序 → 有联系方式优先
   * 此文件不得随意修改。修改前必须与用户确认。
   * gen_daily_report.py 的排序必须调用 config_report.sort_key()，禁止硬编码排序逻辑
+
+## 紧急恢复
+如果gen_daily_report.py被改坏（症状：重复数据、缺失分组、读全量数据库），立即执行：
+git checkout v2.5-stable -- jianchi/gen_daily_report.py
+然后只做最小改动，不要重写文件。
