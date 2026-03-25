@@ -322,6 +322,46 @@ def gen_ai_notes(rec):
 
     return " + ".join(notes) if notes else "普通减持"
 
+def merge_concert_parties(records):
+    """
+    合并一致行动人：同一公告(同股票代码+同公告链接)中，
+    股东类型为"一致行动人"的多条记录合并为一条。
+    减持比例取其共用值（一致行动人共用一个合计减持计划），
+    股东名称拼接显示。
+    """
+    from collections import defaultdict
+
+    # 按(股票代码, 公告链接)分组
+    groups = defaultdict(list)
+    for rec in records:
+        key = (rec.get("股票代码", ""), rec.get("公告链接", ""))
+        groups[key].append(rec)
+
+    merged = []
+    for key, recs in groups.items():
+        # 分离：一致行动人 vs 普通股东
+        concert = [r for r in recs if r.get("股东类型", "") == "一致行动人"]
+        normal = [r for r in recs if r.get("股东类型", "") != "一致行动人"]
+
+        # 普通股东直接保留
+        merged.extend(normal)
+
+        # 一致行动人合并为一条
+        if concert:
+            base = dict(concert[0])  # 以第一条为基础
+            names = [r.get("股东名称", "") for r in concert]
+            base["股东名称"] = " + ".join(names)
+            # 减持比例取第一条（一致行动人共用合计比例）
+            # 股东持股比例取合计
+            total_hold = sum(to_float_ratio(r.get("股东持股比例(%)", 0)) for r in concert)
+            if total_hold > 0:
+                base["股东持股比例(%)"] = f"{total_hold:.2f}"
+            base["股东类型"] = f"一致行动人（{len(concert)}家合计）"
+            merged.append(base)
+
+    return merged
+
+
 def gen_report(date_str=None):
     # 校验排序规则完整性
     assert len(LOCK_PRIORITY) == 6, "锁定优先级必须有6个级别"
@@ -349,6 +389,9 @@ def gen_report(date_str=None):
             seen[key] = rec
 
     unique = list(seen.values())
+
+    # 合并一致行动人：同一公告中股东类型为"一致行动人"的记录合并为一条
+    unique = merge_concert_parties(unique)
 
     # 加载联系方式（排序需要用到）
     contacts = load_contacts_index()
