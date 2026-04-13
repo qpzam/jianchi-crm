@@ -1,13 +1,4 @@
 #!/usr/bin/env python3
-# ╔══════════════════════════════════════════════════════════╗
-# ║  ⚠️  核心文件 - 稳定版本 v2.5                           ║
-# ║  修改此文件前必须：                                      ║
-# ║  1. git stash 保存当前改动                               ║
-# ║  2. 理解六级排序规则（见 config_report.py）               ║
-# ║  3. 修改后运行 python3 jianchi/gen_daily_report.py 验证  ║
-# ║  4. 确认输出：无重复、有分组、有锁定判断、有AI备注       ║
-# ║  5. 如果改坏了: git checkout v2.5-stable -- jianchi/gen_daily_report.py ║
-# ╚══════════════════════════════════════════════════════════╝
 """
 每日减持简报生成器
 读取 parsed JSON + 合并联系方式库 → 生成清晰的TXT报告
@@ -31,6 +22,32 @@ except ImportError:
     )
 
 BASE = os.path.expanduser("~/Desktop/减持获客系统")
+HISTORY_PATH = os.path.join(BASE, "jianchi/data/reported_history.json")
+
+
+def load_history():
+    """加载已报告历史记录"""
+    if os.path.exists(HISTORY_PATH):
+        try:
+            with open(HISTORY_PATH, "r", encoding="utf-8") as f:
+                return json.load(f).get("entries", {})
+        except (json.JSONDecodeError, KeyError):
+            pass
+    return {}
+
+
+def save_history(entries):
+    """原子写入历史记录"""
+    tmp = HISTORY_PATH + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump({"entries": entries}, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, HISTORY_PATH)
+
+
+def history_key(rec):
+    """历史记录唯一key: 证券代码|股东名称"""
+    return f"{rec.get('股票代码', '')}|{rec.get('股东名称', '')}"
+
 
 def to_float_ratio(val):
     """将可能带%的比率字符串转为浮点数"""
@@ -348,25 +365,33 @@ def merge_concert_parties(records):
 
     merged = []
     for key, recs in groups.items():
-        # 分离：一致行动人 vs 普通股东
-        concert = [r for r in recs if r.get("股东类型", "") == "一致行动人"]
-        normal = [r for r in recs if r.get("股东类型", "") != "一致行动人"]
+        # 分离：有分组标识的一致行动人 vs 其他股东
+        concert = [r for r in recs if r.get("一致行动人分组", "")]
+        normal = [r for r in recs if not r.get("一致行动人分组", "")]
 
-        # 普通股东直接保留
+        # 无分组标识的股东直接保留
         merged.extend(normal)
 
-        # 一致行动人合并为一条
+        # 一致行动人按分组字段再细分，避免不同组被错误合并
         if concert:
-            base = dict(concert[0])  # 以第一条为基础
-            names = [r.get("股东名称", "") for r in concert]
-            base["股东名称"] = " + ".join(names)
-            # 减持比例取第一条（一致行动人共用合计比例）
-            # 股东持股比例取合计
-            total_hold = sum(to_float_ratio(r.get("股东持股比例(%)", 0)) for r in concert)
-            if total_hold > 0:
-                base["股东持股比例(%)"] = f"{total_hold:.2f}"
-            base["股东类型"] = f"一致行动人（{len(concert)}家合计）"
-            merged.append(base)
+            sub_groups = defaultdict(list)
+            for r in concert:
+                sub_groups[r.get("一致行动人分组", "")].append(r)
+
+            for grp_key, grp_recs in sub_groups.items():
+                base = dict(grp_recs[0])
+                names = [r.get("股东名称", "") for r in grp_recs]
+                base["股东名称"] = " + ".join(names)
+                # 减持比例：组内求和
+                total_ratio = sum(to_float_ratio(r.get("减持比例(%)", "")) for r in grp_recs)
+                if total_ratio > 0:
+                    base["减持比例(%)"] = f"{total_ratio:.2f}"
+                # 股东持股比例取合计
+                total_hold = sum(to_float_ratio(r.get("股东持股比例(%)", 0)) for r in grp_recs)
+                if total_hold > 0:
+                    base["股东持股比例(%)"] = f"{total_hold:.2f}"
+                base["股东类型"] = f"一致行动人（{len(grp_recs)}家合计）"
+                merged.append(base)
 
     return merged
 
@@ -399,6 +424,37 @@ def gen_report(date_str=None):
 
     unique = list(seen.values())
 
+    # ── 历史去重：在合并前按个体股东过滤（避免合并名变化导致漏匹配）──
+    hist = load_history()
+    pre_merge_count = len(unique)
+    new_individual_keys = []  # 记录新增的个体key，合并后用于写入history
+    filtered = []
+    for rec in unique:
+        hk = history_key(rec)
+        if hk in hist:
+            continue  # 已报告过，丢弃
+        filtered.append(rec)
+        new_individual_keys.append((hk, rec))
+    hist_filtered_count = pre_merge_count - len(filtered)
+    unique = filtered
+
+    # ── 过滤补丁：排除减持期间已过期的条目（减持结果公告而非减持计划）──
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    _before_expire = len(unique)
+    _unique_after = []
+    _kept_ids = set()
+    for r in unique:
+        end_date = r.get("截止日期", "")
+        if end_date and end_date < today_str:
+            continue
+        _unique_after.append(r)
+        _kept_ids.add(id(r))
+    unique = _unique_after
+    new_individual_keys = [(hk, r) for hk, r in new_individual_keys if id(r) in _kept_ids]
+    _expired_count = _before_expire - len(unique)
+    if _expired_count > 0:
+        print(f"过滤已过期减持: {_expired_count} 条")
+
     # 合并一致行动人：同一公告中股东类型为"一致行动人"的记录合并为一条
     unique = merge_concert_parties(unique)
 
@@ -420,7 +476,11 @@ def gen_report(date_str=None):
     unique.sort(key=lambda r: config_sort_key(
         r, has_contact=len(rec_contacts.get(id(r), [])) > 0
     ))
-    print(f"去重后 {len(unique)} 家")
+
+    if hist_filtered_count > 0:
+        print(f"去重后 {len(unique)} 家（过滤往期 {hist_filtered_count} 条）")
+    else:
+        print(f"去重后 {len(unique)} 家")
 
     # 生成报告
     out_path = os.path.join(BASE, f"jianchi/daily_output/今日减持_{date_str}.txt")
@@ -534,12 +594,19 @@ def gen_report(date_str=None):
         uk_n = group_counts.get("待确认", 0)
         f.write(f"    🌟 创投: {vc_n} 家 | 💚 不锁: {nl_n} 家 | 💛 瑕疵: {fl_n} 家 | 🔒 锁定: {lk_n} 家 | ❓ 待确认: {uk_n} 家\n")
         f.write(f"    有联系方式: {matched_count} 家 | 无联系方式: {len(unmatched)} 家\n")
+        if hist_filtered_count > 0:
+            f.write(f"    去重过滤: {hist_filtered_count} 条（已在往期日报中报告）\n")
         f.write("=" * 60 + "\n")
 
         if unmatched:
             f.write("\n【未匹配联系方式的公司】\n")
             for u in unmatched:
                 f.write(f"  - {u}\n")
+
+    # ── 新条目写入历史记录（用合并前的个体key）──
+    for hk, _ in new_individual_keys:
+        hist[hk] = date_str
+    save_history(hist)
 
     print(f"\n已生成: {out_path}")
     print(f"  {len(unique)} 家公司 | {matched_count} 家有联系方式 | {len(unmatched)} 家无")

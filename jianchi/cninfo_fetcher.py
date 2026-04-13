@@ -10,6 +10,7 @@
 import os
 import re
 import time
+import random
 from datetime import datetime, timedelta
 
 import requests
@@ -17,7 +18,11 @@ import requests
 from .config import (
     CNINFO_API_URL, CNINFO_PDF_BASE, CNINFO_HEADERS,
     INCLUDE_KEYWORDS, EXCLUDE_KEYWORDS, PDF_DIR,
+    get_cninfo_headers,
 )
+
+
+MAX_PAGES = 50  # 分页硬上限，防止无限循环
 
 
 def search_announcements(date_str: str) -> list[dict]:
@@ -27,7 +32,7 @@ def search_announcements(date_str: str) -> list[dict]:
     返回: 巨潮网原始公告列表
     """
     items, page = [], 1
-    while True:
+    while page <= MAX_PAGES:
         payload = {
             "pageNum": page, "pageSize": 30,
             "tabName": "fulltext", "column": "", "stock": "",
@@ -39,14 +44,14 @@ def search_announcements(date_str: str) -> list[dict]:
         data = None
         for attempt in range(3):
             try:
-                r = requests.post(CNINFO_API_URL, headers=CNINFO_HEADERS,
+                r = requests.post(CNINFO_API_URL, headers=get_cninfo_headers(),
                                   data=payload, timeout=15)
                 data = r.json()
                 break
             except Exception as e:
                 print(f"  ✗ 请求失败 pg={page} (第{attempt+1}次): {e}")
                 if attempt < 2:
-                    time.sleep(3)
+                    time.sleep(3 + random.uniform(0, 2))
 
         if data is None:
             print(f"  ✗ pg={page} 重试3次均失败，跳过")
@@ -64,15 +69,17 @@ def search_announcements(date_str: str) -> list[dict]:
         if not data.get("hasMore"):
             break
         page += 1
-        time.sleep(1)
+        time.sleep(random.uniform(0.5, 2.0))
 
+    if page > MAX_PAGES:
+        print(f"  ⚠️ 已达分页上限({MAX_PAGES}页)，可能有遗漏")
     return items
 
 
 def search_date_range(start_date: str, end_date: str) -> list[dict]:
     """搜索日期范围内的公告"""
     items, page = [], 1
-    while True:
+    while page <= MAX_PAGES:
         payload = {
             "pageNum": page, "pageSize": 30,
             "tabName": "fulltext", "column": "", "stock": "",
@@ -84,14 +91,14 @@ def search_date_range(start_date: str, end_date: str) -> list[dict]:
         data = None
         for attempt in range(3):
             try:
-                r = requests.post(CNINFO_API_URL, headers=CNINFO_HEADERS,
+                r = requests.post(CNINFO_API_URL, headers=get_cninfo_headers(),
                                   data=payload, timeout=15)
                 data = r.json()
                 break
             except Exception as e:
                 print(f"  ✗ 请求失败 pg={page} (第{attempt+1}次): {e}")
                 if attempt < 2:
-                    time.sleep(3)
+                    time.sleep(3 + random.uniform(0, 2))
 
         if data is None:
             print(f"  ✗ pg={page} 重试3次均失败，跳过")
@@ -104,8 +111,10 @@ def search_date_range(start_date: str, end_date: str) -> list[dict]:
         if not data.get("hasMore"):
             break
         page += 1
-        time.sleep(1)
+        time.sleep(random.uniform(0.5, 2.0))
 
+    if page > MAX_PAGES:
+        print(f"  ⚠️ 已达分页上限({MAX_PAGES}页)，可能有遗漏")
     return items
 
 

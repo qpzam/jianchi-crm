@@ -3,6 +3,8 @@
 所有路径、API密钥、常量集中管理
 """
 import os
+import time
+import base64
 from pathlib import Path
 
 # ============================================================
@@ -32,8 +34,57 @@ OPENAI_MODEL = os.getenv("OPENAI_MODEL")
 # ============================================================
 CNINFO_API_URL = "http://www.cninfo.com.cn/new/hisAnnouncement/query"
 CNINFO_PDF_BASE = "http://static.cninfo.com.cn/"
+
+# User-Agent 池，随机轮换防反爬
+CNINFO_UA_POOL = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/121.0",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Safari/605.1.15",
+]
+
+
+def _gen_accept_enckey() -> str:
+    """生成巨潮网 Accept-Enckey 加密参数（AES-CBC加密时间戳）"""
+    try:
+        from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+        from cryptography.hazmat.primitives import padding as crypto_padding
+
+        key = b"1234567887654321"
+        iv = b"1234567887654321"
+        plaintext = str(int(time.time())).encode("utf-8")
+
+        padder = crypto_padding.PKCS7(128).padder()
+        padded = padder.update(plaintext) + padder.finalize()
+
+        cipher = Cipher(algorithms.AES(key), modes.CBC(iv))
+        encryptor = cipher.encryptor()
+        ct = encryptor.update(padded) + encryptor.finalize()
+
+        return base64.b64encode(ct).decode("utf-8")
+    except Exception:
+        return ""
+
+
+def get_cninfo_headers() -> dict:
+    """获取巨潮网请求头（含动态加密参数和随机UA）"""
+    import random
+    headers = {
+        "User-Agent": random.choice(CNINFO_UA_POOL),
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "Accept": "application/json, text/plain, */*",
+        "Origin": "http://www.cninfo.com.cn",
+        "Referer": "http://www.cninfo.com.cn/new/commonUrl?url=disclosure/list/search",
+    }
+    enckey = _gen_accept_enckey()
+    if enckey:
+        headers["Accept-Enckey"] = enckey
+    return headers
+
+
+# 保持向后兼容（静态引用），但推荐使用 get_cninfo_headers()
 CNINFO_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+    "User-Agent": CNINFO_UA_POOL[0],
     "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
     "Accept": "application/json, text/plain, */*",
     "Origin": "http://www.cninfo.com.cn",

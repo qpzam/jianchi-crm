@@ -42,10 +42,42 @@ def send_sms(phone, message):
     phone = re.sub(r'[^\d]', '', phone)
     if len(phone) == 11:
         phone = "+86" + phone
-    safe_msg = message.replace('"', '\\"').replace("'", "\\'")
-    script = f'tell application "Messages"\nsend "{safe_msg}" to buddy "{phone}" of (service 1 whose service type is iMessage)\nend tell'
-    result = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=15)
-    return result.returncode == 0
+    # 用临时文件传递AppleScript，避免命令注入
+    import tempfile
+    script = (
+        'tell application "Messages"\n'
+        f'set msgText to "{message}"\n'
+        f'send msgText to buddy "{phone}" of (service 1 whose service type is iMessage)\n'
+        'end tell\n'
+    )
+    # 转义AppleScript字符串中的特殊字符
+    script = script.replace("\\", "\\\\")
+    script_content = (
+        'tell application "Messages"\n'
+        'set msgText to (read POSIX file "{tmpfile}")\n'
+        'send msgText to buddy "{phone}" of (service 1 whose service type is iMessage)\n'
+        'end tell\n'
+    )
+    try:
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f:
+            f.write(message)
+            tmp_path = f.name
+        apple_script = (
+            f'set msgText to (read POSIX file "{tmp_path}" as «class utf8»)\n'
+            f'tell application "Messages"\n'
+            f'send msgText to buddy "{phone}" of (service 1 whose service type is iMessage)\n'
+            f'end tell'
+        )
+        result = subprocess.run(["osascript", "-e", apple_script],
+                                capture_output=True, text=True, timeout=15)
+        return result.returncode == 0
+    except Exception:
+        return False
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except Exception:
+            pass
 
 def gen_sms(template, stock_name, contact_name=""):
     if not contact_name:

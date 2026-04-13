@@ -140,12 +140,13 @@ def run_pipeline(
 
     print(f"\n解析完成: {len(records)} 条记录")
 
-    # 保存中间结果
+    # 保存中间结果（原子写入：先写.tmp再rename，防止断电损坏）
     json_path = os.path.join(output_dir, f"parsed_{today_str}.json")
-    with open(json_path, "w", encoding="utf-8") as f:
-        # 移除不可序列化的 _raw 字段
-        clean_records = [{k: v for k, v in r.items() if k != "_raw"} for r in records]
+    tmp_path = json_path + ".tmp"
+    clean_records = [{k: v for k, v in r.items() if k != "_raw"} for r in records]
+    with open(tmp_path, "w", encoding="utf-8") as f:
         json.dump(clean_records, f, ensure_ascii=False, indent=2)
+    os.replace(tmp_path, json_path)
     print(f"  中间结果: {json_path}")
 
     # ========== 阶段3: 评分 (可选) ==========
@@ -264,39 +265,8 @@ def run_pipeline(
     # 数据库累计
     db_stats = get_stats()
 
-    # 输出 TXT 简报
+    # TXT日报由 gen_daily_report.py 生成，pipeline不再写简报避免覆盖冲突
     txt_path = os.path.join(output_dir, f"今日减持_{today_str}.txt")
-    with open(txt_path, "w", encoding="utf-8") as tf:
-        tf.write(f"{'='*60}\n")
-        tf.write(f"  减持获客日报  {today_str}\n")
-        tf.write(f"  抓取: {len(records)} 条 | 新增: {dedup['new']} | 匹配: {matched}/{len(records)}\n")
-        tf.write(f"{'='*60}\n\n")
-
-        # 按优先级排序
-        sorted_recs = sorted(records, key=lambda r: {"高":0,"中":1,"低":2}.get(r.get("优先级","低"), 2))
-        for i, rec in enumerate(sorted_recs, 1):
-            code = rec.get("股票代码", "")
-            name = rec.get("股票名称", "")
-            holder = rec.get("股东名称", "")[:15]
-            ratio = rec.get("减持比例(%)", "")
-            method = rec.get("减持方式", "")[:8]
-            start = rec.get("起始日期", "")
-            end = rec.get("截止日期", "")
-            prio = rec.get("优先级", "")
-            contact = rec.get("联系人", "")
-            phone = rec.get("手机", "")
-            title = rec.get("职务", "")[:10]
-
-            prio_icon = {"高":"🔴","中":"🟡","低":"🟢"}.get(prio, "  ")
-            tf.write(f"{prio_icon} [{i}] {code} {name} | {holder} | {ratio}%\n")
-            tf.write(f"    减持方式: {method}  窗口: {start} ~ {end}\n")
-            if contact and phone:
-                tf.write(f"    📱 {contact} {title} {phone}\n")
-            elif contact:
-                tf.write(f"    📱 {contact} {title}\n")
-            else:
-                tf.write(f"    ❌ 无联系方式\n")
-            tf.write(f"\n")
 
     print(f"\n📊 本次汇总:")
     print(f"  解析: {len(records)} 条 → 新增 {dedup['new']} + 更新 {dedup['updated']}")
@@ -304,13 +274,6 @@ def run_pipeline(
     if any(r.get("匹配方式") for r in records):
         print(f"  匹配率: {matched}/{len(records)} ({matched/max(len(records),1)*100:.0f}%)")
     print(f"  输出: {txt_path}")
-
-    # 自动打开TXT
-    import subprocess
-    try:
-        subprocess.run(["open", txt_path], timeout=3)
-    except:
-        pass
 
     print(f"\n📦 数据库累计:")
     print(f"  总线索: {db_stats['total']} 条")

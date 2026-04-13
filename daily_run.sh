@@ -8,10 +8,19 @@ export TZ=Asia/Shanghai
 source "$BASE_DIR/venv/bin/activate"
 cd "$BASE_DIR"
 
-# 从 .env 加载密钥（使用绝对路径）
+# 从 .env 安全加载密钥（逐行解析，避免暴露到所有子进程）
 if [ -f "$BASE_DIR/.env" ]; then
     chmod 600 "$BASE_DIR/.env" 2>/dev/null
-    export $(grep -v '^#' "$BASE_DIR/.env" | xargs)
+    while IFS='=' read -r key value; do
+        # 跳过注释和空行
+        [[ "$key" =~ ^#.*$ || -z "$key" ]] && continue
+        # 去掉值的引号
+        value="${value%\"}"
+        value="${value#\"}"
+        value="${value%\'}"
+        value="${value#\'}"
+        export "$key=$value"
+    done < "$BASE_DIR/.env"
 fi
 
 # 只在工作日运行

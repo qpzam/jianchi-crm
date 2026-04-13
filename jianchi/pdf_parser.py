@@ -188,13 +188,22 @@ def parse_regex(text: str, meta: dict = None) -> dict:
 # AI 解析模式（支持 OpenAI 兼容接口 / Anthropic）
 # ============================================================
 
-def _load_ai_prompt():
-    """从外部文件加载AI解析prompt"""
-    prompt_path = os.path.join(os.path.dirname(__file__), "prompts", "parse_reduction.txt")
-    with open(prompt_path, "r", encoding="utf-8") as f:
-        return f.read()
+_AI_PROMPT_CACHE = None
 
-_AI_PROMPT = _load_ai_prompt()
+
+def _load_ai_prompt():
+    """从外部文件加载AI解析prompt（延迟加载，首次调用时读取）"""
+    global _AI_PROMPT_CACHE
+    if _AI_PROMPT_CACHE is not None:
+        return _AI_PROMPT_CACHE
+    prompt_path = os.path.join(os.path.dirname(__file__), "prompts", "parse_reduction.txt")
+    try:
+        with open(prompt_path, "r", encoding="utf-8") as f:
+            _AI_PROMPT_CACHE = f.read()
+    except FileNotFoundError:
+        print(f"  ⚠️ AI prompt文件不存在: {prompt_path}，AI解析将不可用")
+        _AI_PROMPT_CACHE = ""
+    return _AI_PROMPT_CACHE
 
 
 def _create_ai_client():
@@ -241,7 +250,7 @@ def _call_ai(provider: str, client, prompt: str, model: str = None) -> str:
         response = client.chat.completions.create(
             model=model or "gpt-4",
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=1000,
+            max_tokens=8000,
             temperature=0,
         )
         return response.choices[0].message.content.strip()
@@ -249,7 +258,7 @@ def _call_ai(provider: str, client, prompt: str, model: str = None) -> str:
     elif provider == "anthropic":
         response = client.messages.create(
             model=model or "claude-sonnet-4-20250514",
-            max_tokens=1000,
+            max_tokens=8000,
             messages=[{"role": "user", "content": prompt}],
         )
         return response.content[0].text.strip()
@@ -276,6 +285,7 @@ def _build_record(parsed: dict, meta: dict) -> dict:
         "截止日期": parsed.get("截止日期", ""),
         "减持原因": parsed.get("减持原因", ""),
         "是否创投基金减持": parsed.get("是否创投基金减持", "否"),
+        "一致行动人分组": parsed.get("一致行动人分组", ""),
         "warnings": [],
     }
 
@@ -300,7 +310,7 @@ def parse_ai(text: str, meta: dict = None, client_info=None) -> list[dict]:
     truncated = text[:4000] if len(text) > 4000 else text
 
     try:
-        content = _call_ai(provider, client, _AI_PROMPT + truncated, model)
+        content = _call_ai(provider, client, _load_ai_prompt() + truncated, model)
 
         # 清理可能的markdown代码块
         content = re.sub(r'^```json\s*', '', content)

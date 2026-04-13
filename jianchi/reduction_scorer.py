@@ -12,8 +12,10 @@
   股份来源   5分 (解锁意愿)
   PE估值     5分 (高估套现)
 """
+import time
 from datetime import datetime, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from threading import Semaphore
 
 import pandas as pd
 
@@ -87,6 +89,10 @@ class TinyShareAPI:
             return None
 
 
+# API限流信号量：同时最多3个请求，避免触发TinyShare频率限制
+_API_SEMAPHORE = Semaphore(3)
+
+
 def _fetch_stock_data(api: TinyShareAPI, ts_code: str) -> dict:
     """获取单只股票的所有维度数据"""
     data = {"ts_code": ts_code}
@@ -118,8 +124,16 @@ def _fetch_stock_data(api: TinyShareAPI, ts_code: str) -> dict:
     return data
 
 
-def batch_fetch(stocks: set, max_workers: int = 10) -> dict:
-    """并行批量获取所有股票数据"""
+def _fetch_with_throttle(api: TinyShareAPI, ts_code: str) -> dict:
+    """带限流的数据获取"""
+    with _API_SEMAPHORE:
+        result = _fetch_stock_data(api, ts_code)
+        time.sleep(0.2)  # 每次请求后短暂等待
+        return result
+
+
+def batch_fetch(stocks: set, max_workers: int = 5) -> dict:
+    """并行批量获取所有股票数据（限流保护）"""
     try:
         api = TinyShareAPI()
     except ValueError as e:
@@ -134,11 +148,11 @@ def batch_fetch(stocks: set, max_workers: int = 10) -> dict:
     ts_codes = {s: format_ts_code(s) for s in stocks}
     valid = {s: tc for s, tc in ts_codes.items() if tc}
 
-    print(f"📊 并行获取 {len(valid)} 只股票数据 (workers={max_workers})...")
+    print(f"📊 并行获取 {len(valid)} 只股票数据 (workers={max_workers}, 限流=3并发)...")
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {
-            executor.submit(_fetch_stock_data, api, tc): code
+            executor.submit(_fetch_with_throttle, api, tc): code
             for code, tc in valid.items()
         }
         for future in as_completed(futures):

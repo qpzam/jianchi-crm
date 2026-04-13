@@ -8,7 +8,7 @@ import re
 from datetime import datetime, timedelta
 
 
-def parse_date(raw, year: int = 2026) -> str | None:
+def parse_date(raw, year: int = None) -> str | None:
     """
     解析各种格式的日期，返回 'YYYY-MM-DD' 或 None
 
@@ -20,6 +20,9 @@ def parse_date(raw, year: int = 2026) -> str | None:
       '20260320'    → '2026-03-20'  (纯数字)
       45000.0       → Excel数字日期
     """
+    if year is None:
+        year = datetime.now().year
+
     raw = str(raw).strip()
     if not raw or raw.lower() in ('nan', 'none', ''):
         return None
