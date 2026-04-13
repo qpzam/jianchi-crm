@@ -2,7 +2,7 @@
 
 # 减持获客智能系统 JianChi CRM Pro
 
-[![Python](https://img.shields.io/badge/Python-3.12+-blue.svg)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.14+-blue.svg)](https://www.python.org/)
 [![AI Powered](https://img.shields.io/badge/AI-Powered-purple.svg)](https://openai.com/)
 [![macOS](https://img.shields.io/badge/macOS-Compatible-lightgrey.svg)](https://www.apple.com/macos/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
@@ -15,14 +15,30 @@
 
 ## 📢 最近更新
 
+### v2.6.0 (2026-04-13)
+- 🔐 安全加固：daily_run.sh .env逐行解析防注入、SMS临时文件传递防命令注入
+- 🛡️ 巨潮网反爬升级：随机UA池 + Accept-Enckey动态加密参数 + 分页硬上限防死循环
+- 🔧 TinyShare API限流：信号量控制最大3并发，防触发频率限制
+- 💾 JSON原子写入（先.tmp再rename）防断电损坏
+- 📝 AI prompt大幅优化：减持比例/数量提取精度提升，新增一致行动人分组字段
+- 🤝 一致行动人按分组字段合并，支持同一公告多组一致行动人
+- 📋 锁定关键词补充：上市前持有、挂牌前取得、大宗交易取得等
+- 🗂️ 历史去重：已报告的减持公告自动过滤，避免重复出现在日报中
+- ⏰ 过期减持自动过滤：减持期间已结束的条目不再显示
+- 🔧 AI prompt延迟加载+缓存、max_tokens提升至8000
+
+### v2.5.0 (2026-03-25)
+- 🏷️ gen_daily_report.py 稳定版本标签 v2.5-stable
+- 🔀 pipeline.py 移除简陋日报输出，统一由 gen_daily_report.py 生成
+
+<details>
+<summary>查看历史更新记录</summary>
+
 ### v2.4.0 (2026-03-20)
 - 📐 新增 `config_report.py` 排序规则核心配置文件，将日报排序逻辑从代码中剥离
 - 🔀 日报排序六级分组：创投不锁 → 确定不锁 → 瑕疵不锁 → 瑕疵锁定 → 确定锁定 → 待确认
 - 🔒 gen_daily_report.py 启动时自动校验排序规则完整性
 - 📋 锁定判断关键词统一由配置文件管理，防止硬编码漂移
-
-<details>
-<summary>查看历史更新记录</summary>
 
 ### v2.3.0 (2026-03-20)
 - 🕐 daily_run.sh强制设置Asia/Shanghai时区
@@ -80,9 +96,10 @@
 
 | 功能 | 说明 |
 |------|------|
-| 📈 **公告抓取** | 每日自动抓取巨潮网减持公告，支持指定日期范围 |
+| 📈 **公告抓取** | 每日自动抓取巨潮网减持公告，随机UA+加密参数反爬 |
 | 🤖 **AI解析** | 支持OpenAI/Claude API，智能解析PDF提取关键信息 |
-| 📊 **日报生成** | 自动生成带优先级标记、锁定判断、AI备注的减持日报 |
+| 📊 **日报生成** | 六级锁定分组排序、一致行动人合并、历史去重、过期过滤 |
+| 📇 **联系方式匹配** | 12万+联系方式库自动匹配，精确/代码/包含多级匹配 |
 | ⏰ **定时运行** | 支持crontab定时任务，合盖休眠自动唤醒 |
 | 🔍 **CRM管理** | 线索状态跟踪、跟进记录、转化漏斗分析 |
 
@@ -256,7 +273,8 @@ jianchi-crm/
 │   ├── gen_daily_report.py           # 日报生成器
 │   ├── db.py                         # SQLite数据库操作
 │   ├── cli.py                        # 命令行界面
-│   ├── config.py                     # 配置管理
+│   ├── contact_matcher.py            # 联系方式匹配引擎
+│   ├── config.py                     # 配置管理（含巨潮反爬参数）
 │   ├── data/                         # 数据目录（不提交）
 │   ├── daily_output/                 # 每日输出（不提交）
 │   ├── logs/                        # 日志目录
@@ -282,7 +300,7 @@ jianchi-crm/
 | 组件 | 要求 |
 |------|------|
 | 操作系统 | macOS 12+（推荐），Linux（部分功能） |
-| Python | 3.12 或更高版本 |
+| Python | 3.14 或更高版本 |
 | AI API | OpenAI API 或 Claude API |
 | 网络 | 稳定的互联网连接 |
 
@@ -294,7 +312,8 @@ jianchi-crm/
 |------|------|
 | 抓取范围 | 巨潮网全市场减持公告 |
 | 日均公告数 | 10-50条/日 |
-| AI解析准确率 | >95%（基于GPT-4/Claude） |
+| AI解析准确率 | >95%（基于GPT-5.4/Claude） |
+| 联系方式库 | 12万+条，覆盖2.3万家公司 |
 | 单次耗时 | 约2-5分钟（15条公告） |
 
 ---
@@ -387,7 +406,7 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 
 ## 致谢
 
-- [Anthropic](https://claude.com/product/claude-code) - vibe coding
+- [Anthropic Claude Code](https://claude.com/product/claude-code) - vibe coding with Claude Opus
 - [巨潮资讯网](http://www.cninfo.com.cn) - 公告数据来源
 - [OpenAI](https://openai.com/) - GPT模型支持
 - [pdfplumber](https://github.com/jsvine/pdfplumber) - PDF解析库
